@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube Preview Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Генератор превью YouTube</h1>
+        <p>Отправьте ссылку на канал, чтобы получить последние превью, оценку CTR и варианты обновления через Gemini.</p>
+    </header>
+
+    <section class="card">
+        <form method="post" action="/channel">
+            <label for="channel_url">Ссылка на канал</label>
+            <input type="text" id="channel_url" name="channel_url" placeholder="https://www.youtube.com/channel/UC..." value="{{ channel_url or '' }}" required>
+            <button type="submit">Считать превью</button>
+        </form>
+        <p class="hint">Используйте ключи YOUTUBE_API_KEY и GEMINI_API_KEY в переменных окружения перед запуском.</p>
+    </section>
+
+    {% if thumbnails %}
+    <section class="grid">
+        {% for thumb in thumbnails %}
+        <article class="thumb">
+            <img src="{{ thumb.thumbnail_url }}" alt="{{ thumb.title }}" loading="lazy">
+            <div class="thumb__body">
+                <h3>{{ thumb.title }}</h3>
+                <p class="meta">CTR (оценка): {{ thumb.ctr_score }}%</p>
+                <details>
+                    <summary>Описание</summary>
+                    <p>{{ thumb.description }}</p>
+                </details>
+                <form method="post" action="/regenerate/{{ thumb.video_id }}?channel_url={{ channel_url }}">
+                    <input type="hidden" name="title" value="{{ thumb.title }}">
+                    <input type="hidden" name="description" value="{{ thumb.description }}">
+                    <button type="submit">Перегенерировать через Gemini</button>
+                </form>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if gemini_result %}
+    <section class="card highlight">
+        <h2>Результат Gemini</h2>
+        <p class="label">Контекст</p>
+        <pre>{{ gemini_result.prompt }}</pre>
+        <p class="label">Идея</p>
+        <p>{{ gemini_result.idea }}</p>
+        {% if gemini_result.image_data_url %}
+        <div class="preview">
+            <img src="{{ gemini_result.image_data_url }}" alt="Новое превью">
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <footer>
+        <p>Сервис подготовлен для быстрой проверки превью и генерации новых идей на основе Gemini.</p>
+    </footer>
+</body>
+</html>
