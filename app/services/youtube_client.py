@@ -22,9 +22,11 @@ class YouTubeClient:
         self.base_url = "https://www.googleapis.com/youtube/v3"
 
     async def fetch_thumbnails(self, channel_url: str) -> List[ThumbnailInfo]:
-        channel_id = self._extract_channel_id(channel_url)
+        channel_id = await self._resolve_channel_identifier(channel_url)
         if not channel_id:
-            raise ValueError("Не удалось определить ID канала. Укажите ссылку формата https://www.youtube.com/channel/<ID>.")
+            raise ValueError(
+                "Не удалось определить ID канала. Укажите ссылку формата https://www.youtube.com/channel/<ID> или @username."
+            )
 
         uploads_playlist = await self._get_uploads_playlist(channel_id)
         videos = await self._get_latest_videos(uploads_playlist)
@@ -45,6 +47,19 @@ class YouTubeClient:
             return None
         return self._build_thumbnail_info(items[0])
 
+    async def _resolve_channel_identifier(self, value: str) -> Optional[str]:
+        channel_id = self._extract_channel_id(value)
+        if channel_id:
+            return channel_id
+
+        handle = self._extract_handle(value)
+        if handle:
+            if not self.api_key:
+                raise ValueError("Поиск по @username требует установленного YOUTUBE_API_KEY.")
+            return await self._fetch_channel_id_by_handle(handle)
+
+        return None
+
     def _extract_channel_id(self, url: str) -> Optional[str]:
         # Supports https://www.youtube.com/channel/<id> or direct channel id.
         match = re.search(r"(UC[\w-]{22})", url)
@@ -53,6 +68,33 @@ class YouTubeClient:
         if url.startswith("UC") and len(url) >= 24:
             return url
         return None
+
+    def _extract_handle(self, value: str) -> Optional[str]:
+        match = re.search(r"@([A-Za-z0-9._-]+)", value)
+        if match:
+            return match.group(1)
+        if value.startswith("@"):  # fallback if regex failed but value clearly a handle
+            return value.lstrip("@")
+        return None
+
+    async def _fetch_channel_id_by_handle(self, handle: str) -> Optional[str]:
+        url = f"{self.base_url}/search"
+        params = {
+            "part": "snippet",
+            "type": "channel",
+            "q": f"@{handle}",
+            "maxResults": 1,
+            "key": self.api_key,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+        items = data.get("items", [])
+        if not items:
+            return None
+        return items[0].get("id", {}).get("channelId")
 
     async def _get_uploads_playlist(self, channel_id: str) -> str:
         if not self.api_key:
