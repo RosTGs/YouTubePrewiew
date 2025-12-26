@@ -15,7 +15,7 @@
         <form method="post" action="/channel">
             <label for="channel_url">Ссылка на канал</label>
             <input type="text" id="channel_url" name="channel_url" placeholder="https://www.youtube.com/channel/UC..." value="{{ channel_url or '' }}" required>
-            <button type="submit">Загрузить превью</button>
+            <button type="submit">Считать превью</button>
         </form>
         <p class="hint">Используйте ключи YOUTUBE_API_KEY и GEMINI_API_KEY в переменных окружения перед запуском.</p>
     </section>
